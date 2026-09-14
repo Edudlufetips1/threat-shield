@@ -1,0 +1,26 @@
+# Database data directory (Crucial so SQL data is not committed)
+postgres_data/
+mysql_data/
+*.db
+*.sqlite
+
+# Go binaries and variables
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+.env
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
