@@ -24,3 +24,10 @@ ENV/
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Private progress journal (not for the repo)
+JOURNAL.md
+
+# Debug/calibration log output
+run_log.txt
+
