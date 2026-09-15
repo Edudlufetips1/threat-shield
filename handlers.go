@@ -11,21 +11,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Edudlufetips1/threat-shield/internal/db"
+	"github.com/Edudlufetips1/threat-shield/internal/model"
+	"github.com/Edudlufetips1/threat-shield/internal/scoring"
 	"github.com/jackc/pgx/v5"
 )
 
-type Vulnerability struct {
-	ID            string  `json:"id"`
-	Title         string  `json:"title"`
-	Description   string  `json:"description"`
-	Source        string  `json:"source"`
-	Date          string  `json:"date"`
-	RansomwareUse string  `json:"ransomware_use"`
-	DueDate       string  `json:"due_date"`
-	ThreatIndex   float64 `json:"threat_index"`
-}
+type Vulnerability = model.Vulnerability
 
-func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer *ThreatScorer) {
+func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer *scoring.ThreatScorer) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -40,9 +34,12 @@ func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer
 
 	for _, vuln := range vulns {
 		threatIndex := scorer.EvaluateVulnerability(vuln)
-		_, err := conn.Exec(context.Background(),
-			"INSERT INTO vulnerabilities (cve_id, title, description, source, date, ransomware_use, due_date, threat_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (cve_id) DO NOTHING",
-			vuln.ID, vuln.Title, vuln.Description, vuln.Source, vuln.Date, vuln.RansomwareUse, vuln.DueDate, threatIndex)
+		vuln.ThreatIndex = threatIndex
+		if err := db.UpsertVulnerability(context.Background(), conn, vuln); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = db.RecordHistory(context.Background(), conn, vuln)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -52,86 +49,8 @@ func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer
 	w.Write([]byte("Data received by Go engine"))
 }
 
-func queryVulnerabilities(conn *pgx.Conn, queryParams url.Values) ([]Vulnerability, error) {
-	baseQuery := "SELECT cve_id, title, description, source, date::text, ransomware_use, due_date, threat_index FROM vulnerabilities"
-	var conditions []string
-	var args []interface{}
-	argCounter := 1
-
-	minScore := queryParams.Get("min_score")
-	if minScore != "" {
-		threshold, err := strconv.ParseFloat(minScore, 64)
-		if err != nil || threshold < 0 || threshold > 100 {
-			return nil, fmt.Errorf("invalid min_score value (must be between 0 and 100)")
-		}
-		conditions = append(conditions, fmt.Sprintf("threat_index >= $%d", argCounter))
-		args = append(args, threshold)
-		argCounter++
-	}
-
-	searchQuery := queryParams.Get("search")
-	if searchQuery != "" {
-		conditions = append(conditions, fmt.Sprintf("(cve_id ILIKE $%d OR title ILIKE $%d OR description ILIKE $%d)", argCounter, argCounter, argCounter))
-		args = append(args, "%"+searchQuery+"%")
-		argCounter++
-	}
-	if len(conditions) > 0 {
-		baseQuery += " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	sortBy := queryParams.Get("sort")
-	if sortBy == "" {
-		sortBy = "threat_index"
-	}
-	switch sortBy {
-	case "threat_index", "threatIndex", "":
-		baseQuery += " ORDER BY threat_index DESC, cve_id DESC"
-	case "cve_id", "cveId":
-		baseQuery += " ORDER BY cve_id ASC"
-	default:
-		return nil, fmt.Errorf("invalid sort parameter")
-	}
-
-	limitStr := queryParams.Get("limit")
-	if limitStr != "" {
-		limit, err := strconv.Atoi(limitStr)
-		if err != nil || limit < 0 {
-			return nil, fmt.Errorf("invalid limit value (must be a non-negative integer)")
-		}
-		baseQuery += fmt.Sprintf(" LIMIT $%d", argCounter)
-		args = append(args, limit)
-		argCounter++
-	}
-	offsetStr := queryParams.Get("offset")
-	if offsetStr != "" {
-		offset, err := strconv.Atoi(offsetStr)
-		if err != nil || offset < 0 {
-			return nil, fmt.Errorf("invalid offset value (must be a non-negative integer)")
-		}
-		baseQuery += fmt.Sprintf(" OFFSET $%d", argCounter)
-		args = append(args, offset)
-	}
-
-	rows, err := conn.Query(context.Background(), baseQuery, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	vulns := make([]Vulnerability, 0)
-	for rows.Next() {
-		var vuln Vulnerability
-		err := rows.Scan(&vuln.ID, &vuln.Title, &vuln.Description, &vuln.Source, &vuln.Date, &vuln.RansomwareUse, &vuln.DueDate, &vuln.ThreatIndex)
-		if err != nil {
-			return nil, err
-		}
-		vulns = append(vulns, vuln)
-	}
-	return vulns, rows.Err()
-}
-
 func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
-	vulns, err := queryVulnerabilities(conn, r.URL.Query())
+	vulns, err := db.QueryVulnerabilities(r.Context(), conn, r.URL.Query())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -167,7 +86,7 @@ func getDashboard(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	}
 	queryParams.Set("limit", strconv.Itoa(limit+1))
 	queryParams.Set("offset", strconv.Itoa((page-1)*limit))
-	vulns, err := queryVulnerabilities(conn, queryParams)
+	vulns, err := db.QueryVulnerabilities(r.Context(), conn, queryParams)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

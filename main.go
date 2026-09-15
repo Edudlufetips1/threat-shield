@@ -4,23 +4,18 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
+	"time"
+
+	"github.com/Edudlufetips1/threat-shield/internal/collector"
+	"github.com/Edudlufetips1/threat-shield/internal/db"
+	"github.com/Edudlufetips1/threat-shield/internal/scoring"
+	"github.com/Edudlufetips1/threat-shield/internal/worker"
 
 	"github.com/joho/godotenv"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func connectDB() (*pgx.Conn, error) {
-	conn, err := pgx.Connect(context.Background(), "postgres://"+os.Getenv("POSTGRES_USER")+":"+os.Getenv("POSTGRES_PASSWORD")+"@localhost:5432/"+os.Getenv("POSTGRES_DB"))
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
 func main() {
-	scorer := ThreatScorer{
+	scorer := scoring.ThreatScorer{
 		BaseIndex:     23.17,
 		ScalingScalar: 46.08,
 		FallbackHits:  15.0,
@@ -30,12 +25,19 @@ func main() {
 	if err != nil {
 		fmt.Println("No .env file found. Using existing environment variables.")
 	}
-	conn, err := connectDB()
+	conn, err := db.Connect(context.Background())
 	if err != nil {
 		fmt.Println("Failed to connect to the database:", err)
 		return
 	}
 	defer conn.Close(context.Background())
+	worker.StartBackgroundCollector(context.Background(), 10*time.Minute, func(ctx context.Context) error {
+		if err := collector.CollectData(ctx, conn, &scorer, collector.KEV_URL); err != nil {
+			fmt.Println("Failed to collect data:", err)
+			return err
+		}
+		return nil
+	})
 
 	http.HandleFunc("/api/vulnerabilities", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
