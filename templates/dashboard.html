@@ -1,0 +1,61 @@
+{{ define "content" }}
+<div class="flex flex-col gap-6">
+    <h1 class="text-3xl font-bold tracking-tight">{{ .Title }}</h1>
+
+    <!-- Control Panel Form (Sits right here!) -->
+    <form method="GET" action="/" class="bg-base-100 p-4 rounded-box shadow-md flex flex-wrap gap-4 items-center">
+        <div class="form-control">
+            <label class="label"><span class="label-text">Sort By</span></label>
+            <select name="sort" class="select select-bordered select-sm">
+                <option value="threat_index">Threat Index (High to Low)</option>
+                <option value="cve_id">CVE ID (A-Z)</option>
+            </select>
+        </div>
+
+        <div class="form-control">
+            <label class="label"><span class="label-text">Min Threat Score</span></label>
+            <input type="number" name="min_score" placeholder="e.g. 50" class="input input-bordered input-sm w-32" />
+        </div>
+
+        <div class="form-control mt-6">
+            <button type="submit" class="btn btn-primary btn-sm">Apply Filters</button>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text">Show Rows</span></label>
+            <select name="limit" class="select select-bordered select-sm">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="40" selected>40</option>
+            </select>
+        </div>
+    </form>
+
+    <!-- Table Wrapper -->
+    <div class="overflow-x-auto bg-base-100 rounded-box shadow-md p-4">
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th class="w-12">#</th>
+                    <th>CVE ID</th>
+                    <th>Title</th>
+                    <th>Threat Index</th>
+                    <th>Due Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range $index, $vulnerability := .Vulnerabilities }}
+                <tr class="hover">
+                    <td class="font-mono font-bold">{{ add $index 1 }}</td>
+                    <td class="font-mono">{{ $vulnerability.ID }}</td>
+                    <td>{{ $vulnerability.Title }}</td>
+                    <td>
+                        <span class="badge badge-error font-bold">{{ printf "%.2f" $vulnerability.ThreatIndex }}</span>
+                    </td>
+                    <td class="text-sm opacity-80">{{ $vulnerability.DueDate }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}

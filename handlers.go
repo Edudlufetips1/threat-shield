@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -49,8 +51,7 @@ func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer
 	w.Write([]byte("Data received by Go engine"))
 }
 
-func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
-	queryParams := r.URL.Query()
+func queryVulnerabilities(conn *pgx.Conn, queryParams url.Values) ([]Vulnerability, error) {
 	baseQuery := "SELECT cve_id, title, description, source, date::text, ransomware_use, due_date, threat_index FROM vulnerabilities"
 	var conditions []string
 	var args []interface{}
@@ -60,8 +61,7 @@ func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) 
 	if minScore != "" {
 		threshold, err := strconv.ParseFloat(minScore, 64)
 		if err != nil || threshold < 0 || threshold > 100 {
-			http.Error(w, "Invalid min_score value (must be between 0 and 100)", http.StatusBadRequest)
-			return
+			return nil, fmt.Errorf("invalid min_score value (must be between 0 and 100)")
 		}
 		conditions = append(conditions, fmt.Sprintf("threat_index >= $%d", argCounter))
 		args = append(args, threshold)
@@ -82,24 +82,23 @@ func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) 
 	case "cve_id", "cveId":
 		baseQuery += " ORDER BY cve_id ASC"
 	default:
-		http.Error(w, "Invalid sort parameter", http.StatusBadRequest)
-		return
+		return nil, fmt.Errorf("invalid sort parameter")
 	}
 
 	limitStr := queryParams.Get("limit")
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
 		if err != nil || limit < 0 {
-			http.Error(w, "Invalid limit value (must be a non-negative integer)", http.StatusBadRequest)
-			return
+			return nil, fmt.Errorf("invalid limit value (must be a non-negative integer)")
 		}
 		baseQuery += fmt.Sprintf(" LIMIT $%d", argCounter)
 		args = append(args, limit)
+		argCounter++
 	}
+
 	rows, err := conn.Query(context.Background(), baseQuery, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -108,16 +107,59 @@ func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) 
 		var vuln Vulnerability
 		err := rows.Scan(&vuln.ID, &vuln.Title, &vuln.Description, &vuln.Source, &vuln.Date, &vuln.RansomwareUse, &vuln.DueDate, &vuln.ThreatIndex)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return nil, err
 		}
 		vulns = append(vulns, vuln)
 	}
-	if err := rows.Err(); err != nil {
+	return vulns, rows.Err()
+}
+
+func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+	vulns, err := queryVulnerabilities(conn, r.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vulns)
+}
+
+func getDashboard(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+	queryParams := r.URL.Query()
+	if queryParams.Get("sort") == "" {
+		queryParams.Set("sort", "threat_index")
+	}
+	if queryParams.Get("limit") == "" {
+		queryParams.Set("limit", "40")
+	}
+	vulns, err := queryVulnerabilities(conn, queryParams)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(vulns)
+	renderTemplate(w, "dashboard", map[string]interface{}{
+		"Title":           "Threat Dashboard",
+		"Vulnerabilities": vulns,
+	})
+}
+
+func renderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
+	parsedTemplate, err := template.New("layout.html").Funcs(template.FuncMap{
+		"add": func(left, right int) int {
+			return left + right
+		},
+	}).ParseFiles(
+		"templates/layout.html",
+		"templates/dashboard.html",
+		"templates/vulnerability-row.html",
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = parsedTemplate.ExecuteTemplate(w, "layout.html", data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
