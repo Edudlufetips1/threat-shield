@@ -10,12 +10,12 @@ import (
 	"github.com/Edudlufetips1/threat-shield/internal/db"
 	"github.com/Edudlufetips1/threat-shield/internal/model"
 	"github.com/Edudlufetips1/threat-shield/internal/scoring"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
-func CollectData(ctx context.Context, conn *pgx.Conn, scorer *scoring.ThreatScorer, feedUrl string) error {
+func CollectData(ctx context.Context, conn *pgxpool.Pool, scorer *scoring.ThreatScorer, feedUrl string) error {
 	stdlog.Printf("Starting data collection from CISA KEV feed")
 	vulnerabilitiesProcessed := 0
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedUrl, nil)

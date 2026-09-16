@@ -3,16 +3,18 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/Edudlufetips1/threat-shield/internal/alert"
 	"github.com/Edudlufetips1/threat-shield/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func QueryVulnerabilities(ctx context.Context, conn *pgx.Conn, queryParams url.Values) ([]model.Vulnerability, error) {
-	baseQuery := "SELECT cve_id, title, description, source, date::text, ransomware_use, due_date, threat_index FROM vulnerabilities"
+func QueryVulnerabilities(ctx context.Context, conn *pgxpool.Pool, queryParams url.Values) ([]model.Vulnerability, error) {
+	baseQuery := "SELECT cve_id, title, description, source, COALESCE(date::text, ''), ransomware_use, COALESCE(due_date::text, ''), threat_index FROM vulnerabilities"
 	var conditions []string
 	var args []interface{}
 	argCounter := 1
@@ -47,6 +49,10 @@ func QueryVulnerabilities(ctx context.Context, conn *pgx.Conn, queryParams url.V
 		baseQuery += " ORDER BY threat_index DESC, cve_id DESC"
 	case "cve_id", "cveId":
 		baseQuery += " ORDER BY cve_id ASC"
+	case "due_date_asc":
+		baseQuery += " ORDER BY due_date ASC, cve_id ASC"
+	case "due_date_desc":
+		baseQuery += " ORDER BY due_date DESC, cve_id DESC"
 	default:
 		return nil, fmt.Errorf("invalid sort parameter")
 	}
@@ -86,11 +92,11 @@ func QueryVulnerabilities(ctx context.Context, conn *pgx.Conn, queryParams url.V
 	return vulnerabilities, rows.Err()
 }
 
-func UpsertVulnerability(ctx context.Context, conn *pgx.Conn, vuln model.Vulnerability) error {
+func UpsertVulnerability(ctx context.Context, conn *pgxpool.Pool, vuln model.Vulnerability) error {
 	query := `
 		INSERT INTO vulnerabilities (cve_id, title, description, source, date, ransomware_use, due_date, threat_index)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (cve_id) DO UPDATE SET
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::date, $6, NULLIF($7, '')::date, $8)
+		ON CONFLICT (cve_id) DO UPDATE SET 
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
 			source = EXCLUDED.source,
@@ -98,7 +104,17 @@ func UpsertVulnerability(ctx context.Context, conn *pgx.Conn, vuln model.Vulnera
 			ransomware_use = EXCLUDED.ransomware_use,
 			due_date = EXCLUDED.due_date,
 			threat_index = EXCLUDED.threat_index
+		RETURNING (xmax = 0) AS inserted
 	`
-	_, err := conn.Exec(ctx, query, vuln.ID, vuln.Title, vuln.Description, vuln.Source, vuln.Date, vuln.RansomwareUse, vuln.DueDate, vuln.ThreatIndex)
-	return err
+	var inserted bool
+	err := conn.QueryRow(ctx, query, vuln.ID, vuln.Title, vuln.Description, vuln.Source, vuln.Date, vuln.RansomwareUse, vuln.DueDate, vuln.ThreatIndex).Scan(&inserted)
+	if err != nil {
+		return err
+	}
+	if inserted {
+		if err := alert.SendNewVulnerabilityAlert(vuln); err != nil {
+			log.Printf("Failed to send new vulnerability alert for %s: %v", vuln.ID, err)
+		}
+	}
+	return nil
 }

@@ -29,6 +29,9 @@ Thumbs.db
 JOURNAL.md
 PROGRESS_REPORT.md
 
+# README still a work-in-progress draft; un-ignore once it's ready to publish
+README.md
+
 # Debug/calibration log output
 run_log.txt
 

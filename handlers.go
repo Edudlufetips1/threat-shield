@@ -10,16 +10,20 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Edudlufetips1/threat-shield/internal/db"
 	"github.com/Edudlufetips1/threat-shield/internal/model"
 	"github.com/Edudlufetips1/threat-shield/internal/scoring"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Vulnerability = model.Vulnerability
 
-func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer *scoring.ThreatScorer) {
+const dateLayout = "2006-01-02"
+
+func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgxpool.Pool, scorer *scoring.ThreatScorer) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -49,7 +53,7 @@ func ingestThreat(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, scorer
 	w.Write([]byte("Data received by Go engine"))
 }
 
-func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgxpool.Pool) {
 	vulns, err := db.QueryVulnerabilities(r.Context(), conn, r.URL.Query())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -59,7 +63,7 @@ func getVulnerabilities(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) 
 	json.NewEncoder(w).Encode(vulns)
 }
 
-func getDashboard(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+func getDashboard(w http.ResponseWriter, r *http.Request, conn *pgxpool.Pool) {
 	queryParams := r.URL.Query()
 	sortVal := queryParams.Get("sort")
 	if sortVal == "" {
@@ -148,7 +152,7 @@ func dashboardPageURL(queryParams url.Values, page, limit int) string {
 	return "/?" + pageParams.Encode()
 }
 
-func getVulnerability(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+func getVulnerability(w http.ResponseWriter, r *http.Request, conn *pgxpool.Pool) {
 	cveID := strings.TrimPrefix(r.URL.Path, "/vulnerabilities/")
 	if cveID == "" {
 		http.NotFound(w, r)
@@ -157,7 +161,7 @@ func getVulnerability(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 
 	var vuln Vulnerability
 	err := conn.QueryRow(context.Background(),
-		"SELECT cve_id, title, description, source, date::text, ransomware_use, due_date, threat_index FROM vulnerabilities WHERE cve_id = $1",
+		"SELECT cve_id, title, description, source, COALESCE(date::text, ''), ransomware_use, COALESCE(due_date::text, ''), threat_index FROM vulnerabilities WHERE cve_id = $1",
 		cveID,
 	).Scan(&vuln.ID, &vuln.Title, &vuln.Description, &vuln.Source, &vuln.Date, &vuln.RansomwareUse, &vuln.DueDate, &vuln.ThreatIndex)
 	if err != nil {
@@ -170,9 +174,28 @@ func getVulnerability(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	}
 
 	renderTemplate(w, "detail", map[string]interface{}{
-		"Title":         vuln.ID,
-		"Vulnerability": vuln,
+		"Title":          vuln.ID,
+		"Vulnerability":  vuln,
+		"DueDateUrgency": dueDateUrgency(vuln.DueDate),
 	})
+}
+
+func dueDateUrgency(dueDate string) string {
+	due, err := time.Parse(dateLayout, dueDate)
+	if err != nil {
+		return ""
+	}
+	daysUntilDue := int(time.Until(due).Hours() / 24)
+	switch {
+	case daysUntilDue < 0:
+		return "Urgency-RED"
+	case daysUntilDue <= 7:
+		return "Urgency-ORANGE"
+	case daysUntilDue <= 14:
+		return "Urgency-YELLOW"
+	default:
+		return ""
+	}
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
@@ -180,10 +203,10 @@ func renderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
 		"add": func(left, right int) int {
 			return left + right
 		},
+		"dueDateUrgency": dueDateUrgency,
 	}).ParseFiles(
 		"templates/layout.html",
 		fmt.Sprintf("templates/%s.html", tmpl),
-		"templates/vulnerability-row.html",
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

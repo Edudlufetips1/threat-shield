@@ -32,7 +32,7 @@ func TestCollectData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to the database: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer conn.Close()
 	threat_scorer := scoring.ThreatScorer{
 		BaseIndex:     50,
 		ScalingScalar: 1.5,

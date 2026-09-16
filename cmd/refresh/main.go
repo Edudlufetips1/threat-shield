@@ -24,7 +24,7 @@ func main() {
 		fmt.Println("Failed to connect to the database:", err)
 		return
 	}
-	defer conn.Close(context.Background())
+	defer conn.Close()
 	if err := collector.CollectData(context.Background(), conn, &scorer, collector.KEV_URL); err != nil {
 		fmt.Println("Collection failed:", err)
 		return

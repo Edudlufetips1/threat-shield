@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
-func Connect(ctx context.Context) (*pgx.Conn, error) {
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	_ = godotenv.Load()
 	user := os.Getenv("POSTGRES_USER")
 	if user == "" {
@@ -29,5 +29,5 @@ func Connect(ctx context.Context) (*pgx.Conn, error) {
 		pass,
 		dbname,
 	)
-	return pgx.Connect(ctx, connString)
+	return pgxpool.New(ctx, connString)
 }

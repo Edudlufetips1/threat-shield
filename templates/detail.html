@@ -23,6 +23,17 @@
         <div class="stat rounded-box bg-base-100 shadow">
             <div class="stat-title">Due Date</div>
             <div class="stat-value text-2xl">{{ .Vulnerability.DueDate }}</div>
+                <div class="stat-desc">
+                    {{ if eq .DueDateUrgency "Urgency-RED" }}
+                        <span class="badge badge-error badge-sm">Urgent</span>
+                    {{ else if eq .DueDateUrgency "Urgency-ORANGE" }}
+                        <span class="badge badge-warning badge-sm">Upcoming</span>
+                    {{ else if eq .DueDateUrgency "Urgency-YELLOW" }}
+                        <span class="badge badge-ghost badge-sm">Later</span>
+                    {{ else }}
+                        <span class="badge badge-success badge-sm">No Rush</span>
+                    {{ end }}
+                </div>
         </div>
     </div>
 

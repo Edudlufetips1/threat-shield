@@ -10,6 +10,10 @@ func StartBackgroundCollector(ctx context.Context, interval time.Duration, colle
 	ticker := time.NewTicker(interval)
 	go func() {
 		defer ticker.Stop()
+		log.Println("Running initial collection task...")
+		if err := collect(ctx); err != nil {
+			log.Printf("Connection initialization failed: %v", err)
+		}
 		for {
 			select {
 			case <-ticker.C:

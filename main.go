@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/Edudlufetips1/threat-shield/internal/auth"
 	"github.com/Edudlufetips1/threat-shield/internal/collector"
 	"github.com/Edudlufetips1/threat-shield/internal/db"
 	"github.com/Edudlufetips1/threat-shield/internal/scoring"
@@ -30,8 +34,9 @@ func main() {
 		fmt.Println("Failed to connect to the database:", err)
 		return
 	}
-	defer conn.Close(context.Background())
-	worker.StartBackgroundCollector(context.Background(), 10*time.Minute, func(ctx context.Context) error {
+	defer conn.Close()
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	worker.StartBackgroundCollector(schedulerCtx, 10*time.Minute, func(ctx context.Context) error {
 		if err := collector.CollectData(ctx, conn, &scorer, collector.KEV_URL); err != nil {
 			fmt.Println("Failed to collect data:", err)
 			return err
@@ -39,13 +44,14 @@ func main() {
 		return nil
 	})
 
-	http.HandleFunc("/api/vulnerabilities", func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/api/vulnerabilities", auth.RequireAPIKey(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			getVulnerabilities(w, r, conn)
 			return
 		}
 		ingestThreat(w, r, conn, &scorer)
-	})
+	})))
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		getDashboard(w, r, conn)
 	})
@@ -57,5 +63,27 @@ func main() {
 		getVulnerability(w, r, conn)
 	})
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	http.ListenAndServe(":8080", nil)
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: nil,
+	}
+
+	// Graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Println("Failed to start server:", err)
+		}
+	}()
+
+	<-stop
+	fmt.Println("Shutting down server...")
+	stopScheduler()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		fmt.Println("Server forced to shutdown:", err)
+	}
 }

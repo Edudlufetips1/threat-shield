@@ -40,6 +40,8 @@
         <select name="sort" class="select select-bordered select-sm">
             <option value="threat_index" {{ if eq .Sort "threat_index" }}selected{{ end }}>Threat Index (High to Low)</option>
             <option value="cve_id" {{ if eq .Sort "cve_id" }}selected{{ end }}>CVE ID (A-Z)</option>
+            <option value="due_date_asc" {{ if eq .Sort "due_date_asc" }}selected{{ end }}>Due Date (Soonest First)</option>
+            <option value="due_date_desc" {{ if eq .Sort "due_date_desc" }}selected{{ end }}>Due Date (Latest First)</option>
         </select>
     </div>
 
@@ -97,7 +99,18 @@
             {{ end }}
         </td>
 
-        <td class="text-sm opacity-80">{{ $vulnerability.DueDate }}</td>
+        <td class="text-sm opacity-80">
+            {{ $urgency := dueDateUrgency $vulnerability.DueDate }}
+            {{ if eq $urgency "Urgency-RED" }}
+                <span class="badge badge-error badge-sm">{{ $vulnerability.DueDate }}</span>
+            {{ else if eq $urgency "Urgency-ORANGE" }}
+                <span class="badge badge-warning badge-sm">{{ $vulnerability.DueDate }}</span>
+            {{ else if eq $urgency "Urgency-YELLOW" }}
+                <span class="badge badge-ghost badge-sm">{{ $vulnerability.DueDate }}</span>
+            {{ else }}
+                {{ $vulnerability.DueDate }}
+            {{ end }}
+        </td>
     </tr>
     {{ end }}
 </tbody>

@@ -28,7 +28,7 @@ func TestQueryExample(t *testing.T) {
 
 	err = UpsertVulnerability(ctx, conn, testVulnerability)
 	if err != nil {
-		conn.Close(ctx)
+		conn.Close()
 		t.Fatalf("Failed to upsert test vulnerability: %v", err)
 	}
 
@@ -36,9 +36,9 @@ func TestQueryExample(t *testing.T) {
 		cleanupConn, cleanErr := Connect(context.Background())
 		if cleanErr == nil {
 			_, _ = cleanupConn.Exec(context.Background(), "DELETE FROM vulnerabilities WHERE cve_id=$1", testVulnerability.ID)
-			cleanupConn.Close(context.Background())
+			cleanupConn.Close()
 		}
-		conn.Close(ctx)
+		conn.Close()
 	})
 
 	queryParams := url.Values{
@@ -90,9 +90,9 @@ func TestUpsertVulnerabilities(t *testing.T) {
 		cleanupConn, cleanErr := Connect(context.Background())
 		if cleanErr == nil {
 			_, _ = cleanupConn.Exec(context.Background(), "DELETE FROM vulnerabilities WHERE cve_id=$1", testID)
-			cleanupConn.Close(context.Background())
+			cleanupConn.Close()
 		}
-		conn.Close(ctx)
+		conn.Close()
 	})
 
 	firstVersion := model.Vulnerability{
