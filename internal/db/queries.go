@@ -102,9 +102,3 @@ func UpsertVulnerability(ctx context.Context, conn *pgx.Conn, vuln model.Vulnera
 	_, err := conn.Exec(ctx, query, vuln.ID, vuln.Title, vuln.Description, vuln.Source, vuln.Date, vuln.RansomwareUse, vuln.DueDate, vuln.ThreatIndex)
 	return err
 }
-
-func UpsertInitialData(ctx context.Context, conn *pgx.Conn) error {
-	// Add any initial data you want to insert into the database here
-	// For example, you could insert some default vulnerabilities
-	return nil
-}

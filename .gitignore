@@ -27,6 +27,7 @@ Thumbs.db
 
 # Private progress journal (not for the repo)
 JOURNAL.md
+PROGRESS_REPORT.md
 
 # Debug/calibration log output
 run_log.txt
