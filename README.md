@@ -109,7 +109,7 @@ The calibration utility uses only the Python standard library.
      go run .
      ```
 
-The server listens on `http://localhost:8080`. The dashboard is public at that address. The collector runs in the background every 10 minutes; it does not perform an immediate collection at startup.
+The server listens on `http://localhost:8080`. The dashboard is public at that address. The collector performs an initial collection on startup and runs in the background every 10 minutes while active.
 
 To collect immediately, in a separate terminal run:
 
