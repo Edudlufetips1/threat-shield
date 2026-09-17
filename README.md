@@ -1,24 +1,50 @@
 # Threat Shield
 
-Threat Shield collects the [CISA Known Exploited Vulnerabilities (KEV) catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog), assigns each record a threat index, and stores the results in PostgreSQL. It provides a small web dashboard and an authenticated JSON API for reviewing the data.
+Threat Shield is an automated system that ingests the Cybersecurity and Infrastructure Security Agency (CISA)'s Known Exploited Vulnerabilities (KEV) catalog, scores each vulnerability, and stores the results in PostgreSQL. When a new vulnerability is detected, it sends a webhook notification.
 
-The project is an early-stage threat-intelligence tool. Its scores are a prioritization aid, not a substitute for vendor guidance, asset context, or a formal risk-management process.
+The system runs as a background process. It periodically fetches the CISA feed, processes new or updated records, and exposes the data through a REST API and web interface.
 
-## How it works
+---
+
+## Architecture
 
 ```text
-CISA KEV feed → collector → threat scoring → PostgreSQL → dashboard and API
-                                                                            ↓
-                                                  optional webhook for newly inserted records
+[CISA Feed]
+     │
+     ▼
+[Collector] ──► [Threat Scorer]
+                      │
+                      ▼
+               [PostgreSQL]
+                      │
+         ┌────────────┴────────────┐
+         ▼                         ▼
+[New Record Check]           [API / Web UI]
+         │
+         ▼ (if new)
+[Webhook Alert]
 ```
 
-When running, the Go service collects the CISA KEV feed every 10 minutes. Each record is scored on a 0–100 scale and upserted by CVE ID, so repeated collections update existing records instead of creating duplicates. Every processed record is also written to a history table. If a record is new and `ALERT_WEBHOOK_URL` is configured, Threat Shield posts a notification to that webhook.
+**Collector**  
+Periodically fetches the CISA KEV catalog on a configurable interval.
 
-## Requirements
+**Threat Scorer**  
+Calculates a risk score for each vulnerability based on available exploitation and impact data.
+
+**Storage**  
+Records are written to PostgreSQL using an idempotent upsert (`INSERT ... ON CONFLICT DO UPDATE`). New insertions are detected using `RETURNING (xmax = 0)`.
+
+**Alerting**  
+When a new vulnerability is inserted, a webhook notification is sent to a configured endpoint.
+
+**API & Web UI**  
+The full dataset is available through REST endpoints and a basic web interface.
+---
 
 ### Required
 
 - **Go 1.26.8**, matching the version declared in `go.mod`.
+- **Python 3.13.x**, matching the runtime environment and dependencies.
 - **Docker Engine** with the Docker Compose plugin, used to run PostgreSQL 15.
 - Internet access to retrieve the CISA KEV feed while collecting data.
 
