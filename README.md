@@ -4,7 +4,13 @@ Threat Shield collects vulnerabilities from CISA's Known Exploited Vulnerabiliti
 
 ---
 
-## 🚀 Quick start
+## 🎯 Motivation
+
+Security teams often face noisy vulnerability feeds and slow manual triage. Threat Shield turns the CISA KEV catalog into scored, searchable, and actionable vulnerability data.
+
+---
+
+## ⚙️ Quick Start
 
 ### Requirements
 
@@ -54,7 +60,7 @@ docker compose exec -T db psql -U user -d threat_shield_db < db/schema.sql
 go run .
 ```
 
-Open the dashboard at **http://localhost:8080**. 
+Open the dashboard at **http://localhost:8080**.
 
 The service collects the CISA KEV catalog when it starts, then repeats collection every 10 minutes. To trigger a collection manually, run this in a second terminal:
 
@@ -64,13 +70,43 @@ go run ./cmd/refresh
 
 ---
 
-## 🔍 What it does
+## 📦 Usage
+
+Once Threat Shield is running, you can interact with it through the dashboard, the REST API, and optional webhook alerts.
+
+### Dashboard
+
+Open **http://localhost:8080** in your browser to view scored vulnerabilities, browse newly discovered entries, and review alert history.
+
+### REST API
+
+Query the API directly. Authenticated endpoints require your `API_KEY`:
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/vulnerabilities
+```
+
+### Manual refresh
+
+Trigger an on-demand collection of the CISA KEV catalog:
+
+```bash
+go run ./cmd/refresh
+```
+
+### Webhook alerts
+
+Set `ALERT_WEBHOOK_URL` in your `.env` file to receive a POST request whenever a new vulnerability is discovered.
+
+### What it does
 
 Threat Shield runs three main processes:
 
 * Collects vulnerability data from CISA's KEV catalog
 * Scores and stores vulnerabilities in PostgreSQL
 * Displays and alerts on newly discovered vulnerabilities through the dashboard, API, and optional webhooks
+
+---
 
 ## 🏗️ Architecture
 
@@ -88,7 +124,9 @@ Collector → Threat Scorer → PostgreSQL
            Webhook alerts
 ```
 
-## ⚙️ Configuration
+---
+
+## 🎛️ Configuration
 
 The following environment variables are supported:
 
@@ -102,7 +140,9 @@ The following environment variables are supported:
 
 *(Note: The database can also run on a local PostgreSQL installation at `localhost:5432` if preferred.)*
 
-## 🐍 Optional Python tools
+---
+
+## Optional Python tools
 
 Python is not required to run the main Go service. It is only needed for the standalone client in `collector/` and the calibration utility:
 
@@ -112,13 +152,13 @@ python -m pip install requests python-dotenv pytest
 
 *(The calibration utility uses only the Python standard library.)*
 
-## 🎯 Motivation
-
-Security teams often face noisy vulnerability feeds and slow manual triage. Threat Shield turns the CISA KEV catalog into scored, searchable, and actionable vulnerability data.
+---
 
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome! Feel free to check out the issues page or open a pull request if you'd like to suggest improvements.
+
+---
 
 ## 📄 License
 
