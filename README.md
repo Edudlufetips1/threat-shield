@@ -23,7 +23,7 @@ Security teams often face noisy vulnerability feeds and slow manual triage. Thre
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Edudlufetips1/threat-shield.git
+git clone https://github.com/asadQ-dev/threat-shield.git
 cd threat-shield
 ```
 
