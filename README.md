@@ -1,6 +1,6 @@
 # Threat Shield
 
-Threat Shield is an automated system that ingests the Cybersecurity and Infrastructure Security Agency (CISA)'s Known Exploited Vulnerabilities (KEV) catalog, scores each vulnerability, and stores the results in PostgreSQL. When a new vulnerability is detected, it sends a webhook notification.
+Threat Shield is an automated system that ingests the Cybersecurity and Infrastructure Security Agency (CISA)'s Known Exploited Vulnerabilities (KEV) catalog, scores each vulnerability based on a custom statistical calibration - as a relative score index - and stores the results in PostgreSQL. When a new vulnerability is detected, it sends a webhook notification.
 
 The system runs as a background process. It periodically fetches the CISA feed, processes new or updated records, and exposes the data through a REST API and web interface.
 
