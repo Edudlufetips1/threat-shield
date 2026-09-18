@@ -6,6 +6,12 @@ The system runs as a background process. It periodically fetches the CISA feed, 
 
 ---
 
+## Motivation
+
+Tracking emerging cybersecurity threats manually is slow and reactive. I built Threat Shield to automate the ingestion of CISA's Known Exploited Vulnerabilities catalog, apply a calibrated score for the useful categorization and scoring of relative risks, and surface actionable alerts instantly via webhooks and a clean dashboard.
+
+---
+
 ## Architecture
 
 ```text
@@ -187,6 +193,12 @@ The project also includes `calibrate_threat_index.py`, a development-only utilit
 ## Current scope
 
 Implemented capabilities include CISA KEV collection, score calculation, PostgreSQL persistence, history records, API-key-protected API access, a basic dashboard, and optional new-record webhook alerts. Additional data sources, alert integrations, and hardened deployment configuration are outside the current scope.
+
+---
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check out the issues page or open a pull request if you'd like to suggest improvements or add new features.
 
 ## License
 
