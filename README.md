@@ -10,7 +10,7 @@ Security teams often face noisy vulnerability feeds and slow manual triage. Thre
 
 ---
 
-## ⚙️ Quick Start
+## 🚀 Quick Start
 
 ### Requirements
 
@@ -70,35 +70,49 @@ go run ./cmd/refresh
 
 ---
 
-## 📦 Usage
+## 📖 Usage
 
-Once Threat Shield is running, you can interact with it through the dashboard, the REST API, and optional webhook alerts.
+The full dataset and advanced features can be accessed dynamically through REST endpoints or explored via the interactive web dashboard.
 
-### Dashboard
+### API & Dashboard Endpoints
 
-Open **http://localhost:8080** in your browser to view scored vulnerabilities, browse newly discovered entries, and review alert history.
+The API requires the `X-API-Key: <API_KEY>` header. The dashboard and vulnerability detail pages are publicly accessible.
 
-### REST API
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Web dashboard with filters and pagination. |
+| `GET` | `/vulnerabilities/{cve_id}` | HTML detail page for a specific CVE. |
+| `GET` | `/api/vulnerabilities` | Returns vulnerabilities as JSON. |
+| `POST` | `/api/vulnerabilities` | Accepts a JSON array of vulnerability records for scoring/storage. |
 
-Query the API directly. Authenticated endpoints require your `API_KEY`:
+### Query Parameters (`/api/vulnerabilities`)
 
+- `min_score`: Filter by a number from 0 to 100.
+- `search`: Text matched against CVE ID, title, and description.
+- `sort`: Sort by `threat_index`, `threatIndex`, `cve_id`, `cveId`, `due_date_asc`, or `due_date_desc`.
+- `limit`: Non-negative integer (defaults to 40 for the dashboard; none for the API).
+- `offset`: Non-negative integer.
+
+**Example API Request:**
 ```bash
-curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/vulnerabilities
+curl -H "X-API-Key: $API_KEY" "http://localhost:8080/api/vulnerabilities?min_score=75&limit=20"
 ```
 
-### Manual refresh
+### Standalone Python Collector
 
-Trigger an on-demand collection of the CISA KEV catalog:
+`collector/collector.py` retrieves the CISA KEV feed and posts normalized records to the local API. Start the Go service first, ensure the same `API_KEY` is available in your `.env`, then run:
 
 ```bash
-go run ./cmd/refresh
+python collector/collector.py
 ```
 
-### Webhook alerts
+### Webhook Alerts
 
-Set `ALERT_WEBHOOK_URL` in your `.env` file to receive a POST request whenever a new vulnerability is discovered.
+Set `ALERT_WEBHOOK_URL` in your `.env` file to receive a JSON webhook message when a CVE is first inserted.
 
-### What it does
+---
+
+## 🔍 What it does
 
 Threat Shield runs three main processes:
 
@@ -142,7 +156,7 @@ The following environment variables are supported:
 
 ---
 
-## Optional Python tools
+## Optional Python Tools
 
 Python is not required to run the main Go service. It is only needed for the standalone client in `collector/` and the calibration utility:
 
