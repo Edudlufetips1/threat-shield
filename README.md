@@ -2,6 +2,8 @@
 
 Threat Shield collects vulnerabilities from CISA's Known Exploited Vulnerabilities (KEV) catalog, scores their relative risk, stores them in PostgreSQL, and displays the results through a web dashboard and REST API.
 
+---
+
 ## 🚀 Quick start
 
 ### Requirements
