@@ -6,7 +6,7 @@ Threat Shield collects vulnerabilities from CISA's Known Exploited Vulnerabiliti
 
 ## 🎯 Motivation
 
-Security teams often face noisy vulnerability feeds and slow manual triage. Threat Shield turns the CISA KEV catalog into scored, searchable, and actionable vulnerability data.
+Security teams often face noisy vulnerability feeds and slow manual triage. Threat Shield turns the CISA KEV catalog into customized, quantified vulnerability data.
 
 ---
 
